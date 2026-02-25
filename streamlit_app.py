@@ -1,57 +1,64 @@
 import requests
 import json
+from urllib3.exceptions import InsecureRequestWarning
 
-# Configuration
+# Suppress SSL warnings (for lab environments only)
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+# Configuration - Update these values
 ORCHESTRATOR_URL = "https://keynote-hpe-discover-orchge-eucentral1.silverpeaksystems.net"
-API_KEY = "d506cb83e9f148adb48c12f16f236cc7827bfadfd8be4427b6be100d02d01e1f938ce61f79a545eab1633f1b606b01fd3b4b438c42ff4423afc1f86a9693a4f3"  # Or use session-based authentication
+API_KEY = "d506cb83e9f148adb48c12f16f236cc7827bfadfd8be4427b6be100d02d01e1f938ce61f79a545eab1633f1b606b01fd3b4b438c42ff4423afc1f86a9693a4f3"  # Or use username/password authentication
 
-# Headers for API requests
-headers = {
-    "Content-Type": "application/json",
-    "X-Auth-Token": API_KEY  # Adjust based on your auth method
-}
-
-def get_all_appliances():
-    """Retrieve list of all appliances"""
-    url = f"{ORCHESTRATOR_URL}/gms/rest/appliance"
-    response = requests.get(url, headers=headers, verify=False)
-    return response.json()
-
-def get_appliance_alarms(ne_pk):
-    """Get alarms for a specific appliance"""
-    url = f"{ORCHESTRATOR_URL}/gms/rest/alarm/appliance"
-    params = {"nePk": ne_pk}
-    response = requests.get(url, headers=headers, params=params, verify=False)
-    return response.json()
-
-def collect_all_alarms():
-    """Main function to collect alarms from all appliances"""
-    all_alarms = []
+def get_all_alarms():
+    """Collect alarms from all appliances and Orchestrator"""
     
-    # Get all appliances
-    appliances = get_all_appliances()
+    headers = {
+        "Content-Type": "application/json",
+        "X-Auth-Token": API_KEY
+    }
     
-    for appliance in appliances:
-        hostname = appliance.get("hostName", "Unknown")
-        ne_pk = appliance.get("nePk")
+    # Get appliance alarms
+    appliance_alarms_url = f"{ORCHESTRATOR_URL}/gms/rest/alarm/appliance"
+    
+    # Get Orchestrator alarms
+    orchestrator_alarms_url = f"{ORCHESTRATOR_URL}/gms/rest/alarm/gms"
+    
+    try:
+        # Fetch appliance alarms
+        print("=" * 60)
+        print("APPLIANCE ALARMS")
+        print("=" * 60)
         
-        print(f"Collecting alarms from: {hostname}")
+        response = requests.get(appliance_alarms_url, headers=headers, verify=False)
+        response.raise_for_status()
+        appliance_alarms = response.json()
         
-        try:
-            alarms = get_appliance_alarms(ne_pk)
-            for alarm in alarms:
-                alarm["applianceName"] = hostname
-                all_alarms.append(alarm)
-        except Exception as e:
-            print(f"Error collecting from {hostname}: {e}")
-    
-    return all_alarms
+        for alarm in appliance_alarms:
+            print(f"Host: {alarm.get('hostName', 'N/A')}")
+            print(f"Severity: {alarm.get('severity', 'N/A')}")
+            print(f"Description: {alarm.get('description', 'N/A')}")
+            print(f"Time: {alarm.get('alarmTime', 'N/A')}")
+            print(f"Recommended Action: {alarm.get('recommendedAction', 'N/A')}")
+            print("-" * 40)
+        
+        # Fetch Orchestrator alarms
+        print("\n" + "=" * 60)
+        print("ORCHESTRATOR ALARMS")
+        print("=" * 60)
+        
+        response = requests.get(orchestrator_alarms_url, headers=headers, verify=False)
+        response.raise_for_status()
+        orch_alarms = response.json()
+        
+        for alarm in orch_alarms:
+            print(f"Source: {alarm.get('source', 'N/A')}")
+            print(f"Severity: {alarm.get('severity', 'N/A')}")
+            print(f"Description: {alarm.get('description', 'N/A')}")
+            print(f"Time: {alarm.get('alarmTime', 'N/A')}")
+            print("-" * 40)
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching alarms: {e}")
 
 if __name__ == "__main__":
-    alarms = collect_all_alarms()
-    
-    # Export to JSON file
-    with open("all_alarms.json", "w") as f:
-        json.dump(alarms, f, indent=2)
-    
-    print(f"\nTotal alarms collected: {len(alarms)}")
+    get_all_alarms()
