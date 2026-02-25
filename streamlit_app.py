@@ -6,7 +6,7 @@ from datetime import datetime
 
 ORCHESTRATOR_URL = "https://keynote-hpe-discover-orchge-eucentral1.silverpeaksystems.net:/gms/rest/"
 API_KEY = "d506cb83e9f148adb48c12f16f236cc7827bfadfd8be4427b6be100d02d01e1f938ce61f79a545eab1633f1b606b01fd3b4b438c42ff4423afc1f86a9693a4f3"
-APPLIANCE_HOSTNAME = "sanjose-01"
+APPLIANCE_HOSTNAME = "4.NE"
 
 requests.packages.urllib3.disable_warnings()
 
