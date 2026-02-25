@@ -1,64 +1,76 @@
 import requests
 import json
-from urllib3.exceptions import InsecureRequestWarning
+import urllib3
 
-# Suppress SSL warnings (for lab environments only)
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+# Disable SSL warnings (for lab environments only)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Configuration - Update these values
-ORCHESTRATOR_URL = "URL"
-API_KEY = "API_AQUI"  # Or use username/password authentication
+# Configuration
+APPLIANCE_IP = "https://keynote-hpe-discover-orchge-eucentral1.silverpeaksystems.net"  # Replace with your appliance IP
+API_KEY = "d506cb83e9f148adb48c12f16f236cc7827bfadfd8be4427b6be100d02d01e1f938ce61f79a545eab1633f1b606b01fd3b4b438c42ff4423afc1f86a9693a4f3"   # Replace with your API key
+BASE_URL = f"https://{APPLIANCE_IP}/rest"
 
-def get_all_alarms():
-    """Collect alarms from all appliances and Orchestrator"""
+# Headers for authentication
+headers = {
+    "X-Auth-Token": API_KEY,
+    "Content-Type": "application/json"
+}
+
+def get_active_flows(filter_type="all", uptime="anytime", protocol=None, application=None):
+    """
+    Retrieve active flows from the appliance.
     
-    headers = {
-        "Content-Type": "application/json",
-        "X-Auth-Token": API_KEY
+    Parameters:
+    - filter_type: all, asymmetric, passThrough, stale
+    - uptime: anytime, last5m, term5m, term
+    - protocol: tcp, udp, icmp, etc.
+    - application: http, https, cifs_smb, etc.
+    """
+    endpoint = f"{BASE_URL}/flows"
+    
+    params = {
+        "filter": filter_type,
+        "uptime": uptime
     }
     
-    # Get appliance alarms
-    appliance_alarms_url = f"{ORCHESTRATOR_URL}/gms/rest/alarm/appliance"
-    
-    # Get Orchestrator alarms
-    orchestrator_alarms_url = f"{ORCHESTRATOR_URL}/gms/rest/alarm/gms"
+    if protocol:
+        params["protocol"] = protocol
+    if application:
+        params["application"] = application
     
     try:
-        # Fetch appliance alarms
-        print("=" * 60)
-        print("APPLIANCE ALARMS")
-        print("=" * 60)
-        
-        response = requests.get(appliance_alarms_url, headers=headers, verify=False)
+        response = requests.get(
+            endpoint,
+            headers=headers,
+            params=params,
+            verify=False  # Set to True in production with valid certs
+        )
         response.raise_for_status()
-        appliance_alarms = response.json()
-        
-        for alarm in appliance_alarms:
-            print(f"Host: {alarm.get('hostName', 'N/A')}")
-            print(f"Severity: {alarm.get('severity', 'N/A')}")
-            print(f"Description: {alarm.get('description', 'N/A')}")
-            print(f"Time: {alarm.get('alarmTime', 'N/A')}")
-            print(f"Recommended Action: {alarm.get('recommendedAction', 'N/A')}")
-            print("-" * 40)
-        
-        # Fetch Orchestrator alarms
-        print("\n" + "=" * 60)
-        print("ORCHESTRATOR ALARMS")
-        print("=" * 60)
-        
-        response = requests.get(orchestrator_alarms_url, headers=headers, verify=False)
-        response.raise_for_status()
-        orch_alarms = response.json()
-        
-        for alarm in orch_alarms:
-            print(f"Source: {alarm.get('source', 'N/A')}")
-            print(f"Severity: {alarm.get('severity', 'N/A')}")
-            print(f"Description: {alarm.get('description', 'N/A')}")
-            print(f"Time: {alarm.get('alarmTime', 'N/A')}")
-            print("-" * 40)
-            
+        return response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching alarms: {e}")
+        print(f"Error retrieving flows: {e}")
+        return None
+
+def display_flow_summary(flow_data):
+    """Display a summary of the flow data."""
+    if not flow_data:
+        return
+    
+    print("\n=== Flow Summary ===")
+    print(f"Total Flows: {flow_data.get('total_flows', 0)}")
+    print(f"Optimized Flows: {flow_data.get('flows_optimized', 0)}")
+    print(f"Passthrough Flows: {flow_data.get('flows_passthrough', 0)}")
+    print(f"Management Flows: {flow_data.get('flows_management', 0)}")
+    print(f"Returned Flows: {flow_data.get('returned_flows', 0)}")
 
 if __name__ == "__main__":
-    get_all_alarms()
+    # Get all active flows
+    flows = get_active_flows()
+    
+    if flows:
+        display_flow_summary(flows)
+        
+        # Optionally save to file
+        with open("active_flows.json", "w") as f:
+            json.dump(flows, f, indent=2)
+        print("\nFlow data saved to active_flows.json")
